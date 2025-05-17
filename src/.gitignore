@@ -1,0 +1,26 @@
+# Environment variables
+.env
+
+# Config files with sensitive information
+/config/Database.php
+
+# Composer dependencies
+/vendor/
+
+# User sessions and logs
+*.log
+*.session
+
+# IDE specific files
+.idea/
+.vscode/
+*.sublime-*
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.swp
+*.swo
+.tmp/ 

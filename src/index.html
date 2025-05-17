@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MFA 시스템 데모</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            gap: 20px;
+        }
+        .section {
+            flex: 1;
+            border: 1px solid #ddd;
+            padding: 20px;
+            border-radius: 5px;
+        }
+        h2 {
+            margin-top: 0;
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        input, button {
+            padding: 8px;
+            font-size: 14px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .qr-code {
+            margin: 20px 0;
+            text-align: center;
+        }
+        .error {
+            color: red;
+            margin-top: 10px;
+        }
+        .success {
+            color: green;
+            margin-top: 10px;
+        }
+        .user-list {
+            margin-top: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <h1>MFA 시스템 데모</h1>
+    
+    <div class="container">
+        <!-- 관리자 섹션 -->
+        <div class="section">
+            <h2>관리자 기능</h2>
+            
+            <h3>사용자 등록</h3>
+            <form id="registerForm">
+                <input type="text" id="registerUsername" placeholder="사용자명" required>
+                <input type="password" id="registerPassword" placeholder="비밀번호" required>
+                <button type="submit">사용자 등록</button>
+            </form>
+            <div id="registerResult"></div>
+            
+            <h3>등록된 사용자</h3>
+            <button onclick="loadUsers()">사용자 목록 새로고침</button>
+            <div id="userList" class="user-list"></div>
+        </div>
+        
+        <!-- 사용자 로그인 섹션 -->
+        <div class="section">
+            <h2>사용자 로그인</h2>
+            
+            <form id="loginForm">
+                <input type="text" id="loginUsername" placeholder="사용자명" required>
+                <input type="password" id="loginPassword" placeholder="비밀번호" required>
+                <input type="text" id="totpCode" placeholder="6자리 인증 코드" maxlength="6">
+                <button type="submit">로그인</button>
+            </form>
+            <div id="loginResult"></div>
+            
+            <h3>로그인 상태</h3>
+            <div id="sessionInfo">로그인하지 않음</div>
+            <button id="logoutBtn" style="display:none;" onclick="logout()">로그아웃</button>
+        </div>
+    </div>
+    
+    <script>
+        const API_BASE = 'http://175.126.191.135:8082'; // API 서버 주소
+        
+        // 사용자 등록
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('registerUsername').value;
+            const password = document.getElementById('registerPassword').value;
+            
+            try {
+                const response = await fetch(`${API_BASE}/admin/users`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('registerResult').innerHTML = `
+                        <div class="success">사용자 등록 성공!</div>
+                        <div class="qr-code">
+                            <p>Salesforce Authenticator에 등록하세요:</p>
+                            ${data.data.qrCode}
+                            <p>Secret: ${data.data.secret}</p>
+                        </div>
+                    `;
+                    loadUsers();
+                } else {
+                    document.getElementById('registerResult').innerHTML = `
+                        <div class="error">Error: ${data.error}</div>
+                    `;
+                }
+            } catch (error) {
+                document.getElementById('registerResult').innerHTML = `
+                    <div class="error">Error: ${error.message}</div>
+                `;
+            }
+        });
+        
+        // 로그인
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('loginUsername').value;
+            const password = document.getElementById('loginPassword').value;
+            const totpCode = document.getElementById('totpCode').value;
+            
+            try {
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password, totpCode })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    localStorage.setItem('sessionToken', data.data.sessionToken);
+                    document.getElementById('loginResult').innerHTML = `
+                        <div class="success">로그인 성공!</div>
+                    `;
+                    updateSessionInfo(data.data);
+                } else {
+                    document.getElementById('loginResult').innerHTML = `
+                        <div class="error">Error: ${data.error}</div>
+                    `;
+                }
+            } catch (error) {
+                document.getElementById('loginResult').innerHTML = `
+                    <div class="error">Error: ${error.message}</div>
+                `;
+            }
+        });
+        
+        // 사용자 목록 불러오기
+        async function loadUsers() {
+            try {
+                const response = await fetch(`${API_BASE}/admin/users`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    let html = '<table><tr><th>ID</th><th>사용자명</th><th>비밀번호</th><th>MFA 상태</th><th>생성일</th><th>액션</th></tr>';
+                    
+                    data.data.forEach(user => {
+                        html += `
+                            <tr>
+                                <td>${user.id}</td>
+                                <td>${user.username}</td>
+                                <td>${user.password}</td>
+                                <td>${user.is_mfa_enabled ? '활성화' : '비활성화'}</td>
+                                <td>${new Date(user.created_at).toLocaleString()}</td>
+                                <td>
+                                    <button onclick="regenerateQR(${user.id})">QR 재생성</button>
+                                    ${!user.is_mfa_enabled ? 
+                                        `<button onclick="enableMFA(${user.id})">MFA 활성화</button>` : 
+                                        `<button onclick="disableMFA(${user.id})">MFA 비활성화</button>`
+                                    }
+                                    <button onclick="deleteUser(${user.id})">삭제</button>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                    
+                    html += '</table>';
+                    document.getElementById('userList').innerHTML = html;
+                }
+            } catch (error) {
+                document.getElementById('userList').innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+        
+        // QR 코드 재생성
+        async function regenerateQR(userId) {
+            try {
+                const response = await fetch(`${API_BASE}/admin/users/qr`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ userId })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('QR 코드가 재생성되었습니다.');
+                    document.getElementById('registerResult').innerHTML = `
+                        <div class="qr-code">
+                            <p>${data.data.username}님의 QR 코드:</p>
+                            ${data.data.qrCode}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+        
+        // MFA 활성화
+        async function enableMFA(userId) {
+            try {
+                const response = await fetch(`${API_BASE}/admin/users/enable-mfa`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ userId })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('MFA가 활성화되었습니다.');
+                    loadUsers();
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+        
+        // MFA 비활성화
+        async function disableMFA(userId) {
+            try {
+                const response = await fetch(`${API_BASE}/admin/users/disable-mfa`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ userId })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('MFA가 비활성화되었습니다.');
+                    loadUsers();
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+        
+        // 사용자 삭제
+        async function deleteUser(userId) {
+            if (!confirm(`정말로 사용자 ID ${userId}를 삭제하시겠습니까?`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/admin/users`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ userId })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('사용자가 삭제되었습니다.');
+                    loadUsers();
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+        
+        // 세션 정보 업데이트
+        function updateSessionInfo(data) {
+            document.getElementById('sessionInfo').innerHTML = `
+                로그인됨: ${data.username} (ID: ${data.userId})
+            `;
+            document.getElementById('logoutBtn').style.display = 'block';
+        }
+        
+        // 로그아웃
+        async function logout() {
+            const sessionToken = localStorage.getItem('sessionToken');
+            
+            try {
+                await fetch(`${API_BASE}/auth/logout`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': sessionToken
+                    }
+                });
+                
+                localStorage.removeItem('sessionToken');
+                document.getElementById('sessionInfo').innerHTML = '로그인하지 않음';
+                document.getElementById('logoutBtn').style.display = 'none';
+                document.getElementById('loginResult').innerHTML = '';
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+        
+        // 페이지 로드시 세션 체크
+        async function checkSession() {
+            const sessionToken = localStorage.getItem('sessionToken');
+            
+            if (sessionToken) {
+                try {
+                    const response = await fetch(`${API_BASE}/auth/validate`, {
+                        headers: {
+                            'Authorization': sessionToken
+                        }
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        updateSessionInfo(data.data);
+                    } else {
+                        localStorage.removeItem('sessionToken');
+                    }
+                } catch (error) {
+                    localStorage.removeItem('sessionToken');
+                }
+            }
+        }
+        
+        // 초기 로드
+        window.onload = () => {
+            loadUsers();
+            checkSession();
+        };
+    </script>
+</body>
+</html>
