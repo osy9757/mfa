@@ -139,6 +139,7 @@ $routes = [
     'POST /admin/users' => ['App\controllers\AdminController', 'registerUser'],
     'GET /admin/users' => ['App\controllers\AdminController', 'listUsers'],
     'POST /admin/users/qr' => ['App\controllers\AdminController', 'regenerateQR'],
+    'POST /admin/users/regenerate-secret' => ['App\controllers\AdminController', 'regenerateSecret'],
     'POST /admin/users/enable-mfa' => ['App\controllers\AdminController', 'enableMFA'],
     'POST /admin/users/disable-mfa' => ['App\controllers\AdminController', 'disableMFA'],
     'DELETE /admin/users' => ['App\controllers\AdminController', 'deleteUser'],

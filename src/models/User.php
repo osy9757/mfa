@@ -210,6 +210,7 @@ class User implements JsonSerializable {
             'id' => $this->id,
             'username' => $this->username,
             'password' => $this->password,
+            'secret' => $this->secret,
             'is_mfa_enabled' => $this->isMfaEnabled ? true : false,
             'created_at' => $this->createdAt
         ];

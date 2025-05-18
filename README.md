@@ -6,10 +6,12 @@
 
 - 사용자 등록 및 관리
 - 시간 기반 일회용 비밀번호(TOTP) 인증
-- QR 코드 생성 (OTP 앱 연동용)
+- QR 코드 확인 및 재생성 (OTP 앱 연동용)
+- 비밀 키(Secret) 재생성 기능
 - 세션 기반 인증 관리
 - MFA 활성화/비활성화 토글 기능
 - 로그인 실패 제한 (보안 기능)
+- 백그라운드 서버 실행 지원
 
 ## 설치 방법
 
@@ -56,6 +58,26 @@
    cd src
    php -S localhost:8080
    ```
+   
+   백그라운드에서 서버 실행하기(터미널 종료 후에도 실행):
+   ```
+   cd src
+   nohup php -S 0.0.0.0:8082 -t . > /dev/null 2>&1 &
+   ```
+   
+   백그라운드 서버 종료:
+   ```
+   pkill -f "php -S 0.0.0.0:8082"
+   ```
+   
+   또는 제공된 스크립트 사용:
+   ```
+   # 서버 시작
+   ./start_nohup.sh
+   
+   # 서버 종료
+   ./kill_nohub.sh
+   ```
 
 6. 브라우저에서 `http://localhost:8080`으로 접속합니다.
 
@@ -73,7 +95,9 @@ src/
 ├── vendor/         - Composer 의존성
 ├── index.php       - 메인 진입점 & 라우터
 ├── index.html      - 프론트엔드 UI
-└── setup_db.php    - 데이터베이스 설정 스크립트
+├── setup_db.php    - 데이터베이스 설정 스크립트
+├── start_nohup.sh  - 백그라운드 서버 시작 스크립트
+└── kill_nohub.sh   - 백그라운드 서버 종료 스크립트
 ```
 
 ### 데이터베이스 구조
@@ -108,7 +132,8 @@ src/
 
 - `POST /admin/users` - 사용자 등록
 - `GET /admin/users` - 사용자 목록 조회
-- `POST /admin/users/qr` - QR 코드 재생성
+- `POST /admin/users/qr` - QR 코드 확인
+- `POST /admin/users/regenerate-secret` - QR 코드 및 비밀 키 재생성
 - `POST /admin/users/enable-mfa` - MFA 활성화
 - `POST /admin/users/disable-mfa` - MFA 비활성화
 - `DELETE /admin/users` - 사용자 삭제
@@ -131,7 +156,8 @@ src/
 
 3. MFA 관리:
    - 관리자는 사용자 목록에서 MFA 활성화/비활성화 가능
-   - QR 코드 재생성 가능 (사용자가 코드를 분실한 경우)
+   - QR 확인: 현재 QR 코드 및 비밀 키 확인
+   - QR 재생성: 새로운 비밀 키 생성 및 QR 코드 갱신 (사용자가 코드를 분실하거나 안전하지 않은 경우)
 
 ## 보안 고려사항
 
@@ -139,6 +165,7 @@ src/
 - 프로덕션 환경에서는 반드시 비밀번호 해싱을 사용해야 합니다. 
 - 프로덕션 환경을 위해 `UserRepository.php`와 `User.php`의 비밀번호 처리 메서드를 수정하세요.
 - 더 안전한 세션 관리와 HTTPS 사용을 권장합니다.
+- 비밀 키는 암호화하여 저장하는 것이 안전합니다.
 
 ## 문제 해결
 
@@ -156,10 +183,20 @@ src/
    - 로그아웃 후에도 로그인 상태가 유지되면 세션 만료 시간을 확인하세요
    - 브라우저 로컬 스토리지를 삭제해보세요
 
+4. 백그라운드 서버 관련 문제
+   - `ps aux | grep "php -S"` 명령어로 서버 프로세스 확인
+   - 포트가 이미 사용 중인 경우 `lsof -i :포트번호`로 확인하고 해당 프로세스 종료
+
 ### 테스트 환경 로그 확인
 
 오류 디버깅을 위해 PHP 로그를 확인하세요:
 ```
 php -S localhost:8080 -d error_reporting=E_ALL -d display_errors=1
+```
+
+기본 서버 출력 로그 확인:
+```
+nohup php -S 0.0.0.0:8082 -t . > server.log 2>&1 &
+tail -f server.log
 ```
 

@@ -98,6 +98,23 @@ class UserRepository {
     }
     
     /**
+     * TOTP Secret 업데이트
+     * @param int $userId 사용자 ID
+     * @param string $secret 새 TOTP Secret 키
+     * @return bool 성공 여부
+     */
+    public function updateSecret($userId, $secret) {
+        $stmt = $this->db->prepare("
+            UPDATE users SET secret = :secret WHERE id = :id
+        ");
+        
+        return $stmt->execute([
+            'id' => $userId,
+            'secret' => $secret
+        ]);
+    }
+    
+    /**
      * 모든 사용자 목록 조회
      * @return array User 객체 배열
      */

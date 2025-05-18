@@ -135,7 +135,6 @@
                     document.getElementById('registerResult').innerHTML = `
                         <div class="success">사용자 등록 성공!</div>
                         <div class="qr-code">
-                            <p>Salesforce Authenticator에 등록하세요:</p>
                             ${data.data.qrCode}
                             <p>Secret: ${data.data.secret}</p>
                         </div>
@@ -207,6 +206,7 @@
                                 <td>${user.is_mfa_enabled ? '활성화' : '비활성화'}</td>
                                 <td>${new Date(user.created_at).toLocaleString()}</td>
                                 <td>
+                                    <button onclick="viewQR(${user.id})">QR 확인</button>
                                     <button onclick="regenerateQR(${user.id})">QR 재생성</button>
                                     ${!user.is_mfa_enabled ? 
                                         `<button onclick="enableMFA(${user.id})">MFA 활성화</button>` : 
@@ -226,8 +226,8 @@
             }
         }
         
-        // QR 코드 재생성
-        async function regenerateQR(userId) {
+        // QR 코드 확인
+        async function viewQR(userId) {
             try {
                 const response = await fetch(`${API_BASE}/admin/users/qr`, {
                     method: 'POST',
@@ -240,11 +240,41 @@
                 const data = await response.json();
                 
                 if (data.success) {
+                    console.log("QR 코드 응답 데이터:", data);
+                    document.getElementById('registerResult').innerHTML = `
+                        <div class="qr-code">
+                            <p>${data.data.username}님의 QR 코드:</p>
+                            ${data.data.qrCode}
+                            <p>Secret: ${data.data.secret}</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+        
+        // QR 코드 재생성
+        async function regenerateQR(userId) {
+            try {
+                const response = await fetch(`${API_BASE}/admin/users/regenerate-secret`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ userId })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    console.log("QR 코드 응답 데이터:", data);
                     alert('QR 코드가 재생성되었습니다.');
                     document.getElementById('registerResult').innerHTML = `
                         <div class="qr-code">
                             <p>${data.data.username}님의 QR 코드:</p>
                             ${data.data.qrCode}
+                            <p>Secret: ${data.data.secret}</p>
                         </div>
                     `;
                 }

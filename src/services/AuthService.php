@@ -125,6 +125,33 @@ class AuthService {
     }
     
     /**
+     * 새 TOTP Secret 생성 및 사용자 정보 업데이트
+     * @param int $userId 사용자 ID
+     * @return array 새 secret, URI 정보
+     * @throws \Exception 사용자를 찾을 수 없는 경우
+     */
+    public function regenerateSecret($userId) {
+        $user = $this->userRepository->findById($userId);
+        if (!$user) {
+            throw new \Exception("사용자를 찾을 수 없습니다.");
+        }
+        
+        // 새 TOTP secret 생성
+        $secret = $this->totpService->generateSecret();
+        
+        // 사용자 정보 업데이트
+        $this->userRepository->updateSecret($userId, $secret);
+        
+        // QR 코드 URI 생성
+        $uri = $this->totpService->generateUri($secret, $user->getUsername());
+        
+        return [
+            'secret' => $secret,
+            'uri' => $uri
+        ];
+    }
+    
+    /**
      * 세션 토큰 생성
      * @return string 랜덤 세션 토큰
      */

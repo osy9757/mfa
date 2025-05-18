@@ -119,7 +119,49 @@ class AdminController {
                 'success' => true,
                 'data' => [
                     'qrCode' => $qrCodeHtml,
-                    'username' => $user->getUsername()
+                    'username' => $user->getUsername(),
+                    'secret' => $user->getSecret()
+                ]
+            ]);
+            
+        } catch (\Exception $e) {
+            http_response_code(400);
+            echo json_encode([
+                'success' => false,
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+    
+    /**
+     * 사용자 QR 코드 및 Secret 재생성 API
+     * POST /admin/users/regenerate-secret
+     */
+    public function regenerateSecret() {
+        header('Content-Type: application/json');
+        
+        try {
+            $input = json_decode(file_get_contents('php://input'), true);
+            
+            if (!isset($input['userId'])) {
+                throw new \Exception("사용자 ID는 필수입니다.");
+            }
+            
+            // Secret 재생성 및 사용자 정보 업데이트
+            $result = $this->authService->regenerateSecret($input['userId']);
+            
+            // 사용자 정보 조회
+            $user = $this->userRepository->findById($input['userId']);
+            
+            // QR 코드 이미지 생성
+            $qrCodeHtml = $this->qrService->generateQRCodeHtml($result['uri']);
+            
+            echo json_encode([
+                'success' => true,
+                'data' => [
+                    'qrCode' => $qrCodeHtml,
+                    'username' => $user->getUsername(),
+                    'secret' => $result['secret']
                 ]
             ]);
             
